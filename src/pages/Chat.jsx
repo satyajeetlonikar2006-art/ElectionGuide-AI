@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useLocation } from 'react-router-dom';
 import { useUserState } from '../contexts/UserStateContext';
 import { CHAT_SUGGESTIONS } from '../constants/copy';
@@ -91,7 +92,6 @@ const ChatPage = () => {
     } catch (err) {
       setMessages(prev => [...prev, { id: Date.now() + 1, role: 'bot', text: "Sorry, I encountered an error." }]);
     } finally {
-      setIsWaiting(true); // Wait, I should set it false!
       setIsWaiting(false);
     }
   };
@@ -259,7 +259,11 @@ const ChatMessage = ({ msg, onSave }) => {
       </div>
       <div className={`max-w-[85%] space-y-2 ${!isBot ? 'items-end' : ''}`}>
         <div className={`p-5 rounded-3xl text-sm leading-relaxed ${isBot ? 'bg-white/5 border border-white/5 text-slate-200' : 'bg-orange-600 text-white font-medium'}`}>
-          {msg.text}
+          {isBot ? (
+            <ReactMarkdown className="prose prose-invert prose-sm max-w-none prose-p:leading-relaxed prose-pre:bg-black/50">{msg.text}</ReactMarkdown>
+          ) : (
+            msg.text
+          )}
         </div>
         
         {isBot && (
