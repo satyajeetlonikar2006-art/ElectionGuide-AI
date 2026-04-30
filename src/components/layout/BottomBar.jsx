@@ -5,7 +5,7 @@ import { Home, MessageSquare, Calendar, CheckSquare, Brain, MapPin } from 'lucid
 const BottomBar = () => {
   const navItems = [
     { to: '/dashboard', icon: Home, label: 'Home' },
-    { to: '/chat', icon: MessageSquare, label: 'Chat' },
+    { to: '/chat', icon: MessageSquare, label: 'AI Chat' },
     { to: '/timeline', icon: Calendar, label: 'Dates' },
     { to: '/checklist', icon: CheckSquare, label: 'Ready' },
     { to: '/quiz', icon: Brain, label: 'Quiz' },

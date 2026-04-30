@@ -20,7 +20,7 @@ const Navbar = () => {
           <Home size={18} /> Home
         </NavLink>
         <NavLink to="/chat" className={({ isActive }) => `flex items-center gap-2 text-sm font-medium transition-colors ${isActive ? 'text-orange-500' : 'text-slate-400 hover:text-white'}`}>
-          <MessageSquare size={18} /> Chat
+          <MessageSquare size={18} /> AI Chat
         </NavLink>
         <NavLink to="/timeline" className={({ isActive }) => `flex items-center gap-2 text-sm font-medium transition-colors ${isActive ? 'text-orange-500' : 'text-slate-400 hover:text-white'}`}>
           <Calendar size={18} /> Timeline
