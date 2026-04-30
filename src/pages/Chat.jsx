@@ -83,6 +83,10 @@ const ChatPage = () => {
       });
       const data = await res.json();
       
+      if (!res.ok) {
+        throw new Error(data.message || "Sorry, I encountered an error.");
+      }
+      
       const botMsg = { id: Date.now() + 1, role: 'bot', text: data.response };
       setMessages(prev => [...prev, botMsg]);
       
@@ -90,7 +94,7 @@ const ChatPage = () => {
       updateHistory(msgText, [...messages, userMsg, botMsg]);
 
     } catch (err) {
-      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'bot', text: "Sorry, I encountered an error." }]);
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'bot', text: err.message || "Sorry, I encountered an error." }]);
     } finally {
       setIsWaiting(false);
     }

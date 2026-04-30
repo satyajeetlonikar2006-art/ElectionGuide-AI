@@ -8,7 +8,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // ── Gemini AI Setup ──────────────────────────────────────────────────────────
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+// Use a placeholder if the key is missing in production, so the server doesn't crash on startup.
+// The chat endpoint will gracefully return a 400 error later if the key is actually missing.
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || 'missing_api_key_in_environment');
 
 const SYSTEM_PROMPT = `You are ElectionGuide AI — a warm, knowledgeable, and strictly nonpartisan civic education assistant. You exist to demystify the election process for every citizen, regardless of their background, education level, or political familiarity. You speak like a trusted friend who happens to be a civics expert — never like a textbook or a government form.
 
