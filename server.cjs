@@ -125,11 +125,14 @@ function validateInput(message) {
 
 // ── Model fallback chain ─────────────────────────────────────────────────────
 const MODELS = [
-  'gemini-flash-latest',
-  'gemini-2.0-flash',
+  'gemini-2.5-flash-lite',
+  'gemini-2.0-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-flash-lite-latest',
   'gemini-2.5-flash',
-  'gemini-pro-latest',
-  'gemini-1.5-flash',
+  'gemini-2.0-flash',
+  'gemini-flash-latest',
+  'gemini-3-flash-preview'
 ];
 
 async function callGeminiWithFallback(history, userMessage) {
@@ -159,7 +162,7 @@ async function callGeminiWithFallback(history, userMessage) {
       } catch (error) {
         lastError = error;
         console.warn(`❌ ${model} attempt ${attempt + 1} failed:`, error.message);
-        if (error.status === 429) break;
+        if (error.status === 429 || error.status === 503) break;
         if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
       }
     }
