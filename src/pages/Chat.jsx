@@ -1,6 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+/**
+ * @fileoverview AI Chat page with multi-turn Gemini conversations.
+ * Features: voice input, session history, message bookmarking, and Firestore persistence.
+ * @module pages/Chat
+ */
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useUserState } from '../contexts/UserStateContext';
+import { useAuth } from '../contexts/AuthContext';
+import { saveChatMessage } from '../config/firebase';
 import { CHAT_SUGGESTIONS } from '../constants/copy';
 import { 
   Send, Mic, MicOff, Copy, Bookmark, Volume2, 
@@ -11,6 +18,7 @@ import {
 const ChatPage = () => {
   const location = useLocation();
   const { saveAnswer } = useUserState();
+  const { user, isAuthenticated } = useAuth();
   
   // States
   const [messages, setMessages] = useState([]);
@@ -89,7 +97,13 @@ const ChatPage = () => {
       const botMsg = { id: Date.now() + 1, role: 'bot', text: data.response };
       setMessages(prev => [...prev, botMsg]);
       
-      // Update History
+      // Persist to Firestore if authenticated
+      if (isAuthenticated && user?.uid) {
+        saveChatMessage(user.uid, activeSessionId, 'user', msgText).catch(() => {});
+        saveChatMessage(user.uid, activeSessionId, 'bot', data.response).catch(() => {});
+      }
+      
+      // Update local History
       updateHistory(msgText, [...messages, userMsg, botMsg]);
 
     } catch (err) {
