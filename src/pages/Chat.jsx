@@ -5,6 +5,7 @@
  */
 import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { useLocation } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import { useUserState } from '../contexts/UserStateContext';
 import { useAuth } from '../contexts/AuthContext';
 import { saveChatMessage } from '../config/firebase';
@@ -257,36 +258,7 @@ const ChatPage = () => {
   );
 };
 
-// Simple markdown formatter to guarantee text visibility without external plugins
-const formatMarkdown = (text) => {
-  if (!text) return null;
-  
-  // Split by double line breaks for paragraphs
-  return text.split('\n\n').map((paragraph, pIdx) => {
-    // Handle bullet points within a paragraph
-    const lines = paragraph.split('\n');
-    return (
-      <p key={pIdx} className="mb-4 last:mb-0">
-        {lines.map((line, lIdx) => {
-          // Parse **bold** text
-          const parts = line.split(/(\*\*.*?\*\*)/g);
-          const formattedLine = parts.map((part, i) => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-              return <strong key={i} className="font-bold text-white">{part.slice(2, -2)}</strong>;
-            }
-            return <span key={i}>{part}</span>;
-          });
-
-          return (
-            <span key={lIdx} className="block mb-1">
-              {formattedLine}
-            </span>
-          );
-        })}
-      </p>
-    );
-  });
-};
+// Removed custom formatMarkdown — using ReactMarkdown instead
 
 const ChatMessage = ({ msg, onSave }) => {
   const isBot = msg.role === 'bot';
@@ -307,7 +279,25 @@ const ChatMessage = ({ msg, onSave }) => {
       </div>
       <div className={`max-w-[85%] space-y-2 ${!isBot ? 'items-end' : ''}`}>
         <div className={`p-5 rounded-3xl text-sm leading-relaxed ${isBot ? 'bg-white/5 border border-white/5 text-slate-200' : 'bg-orange-600 text-white font-medium'}`}>
-          {isBot ? formatMarkdown(msg.text) : msg.text}
+          {isBot ? (
+            <ReactMarkdown
+              components={{
+                h1: ({node, ...props}) => <h1 className="text-xl font-bold mb-2 text-white" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-lg font-bold mb-2 text-white" {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-md font-bold mb-2 text-white" {...props} />,
+                p: ({node, ...props}) => <p className="mb-4 last:mb-0" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-4 space-y-1" {...props} />,
+                ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-4 space-y-1" {...props} />,
+                li: ({node, ...props}) => <li className="" {...props} />,
+                strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
+                a: ({node, ...props}) => <a className="text-orange-400 hover:underline" {...props} />
+              }}
+            >
+              {msg.text}
+            </ReactMarkdown>
+          ) : (
+            msg.text
+          )}
         </div>
         
         {isBot && (
