@@ -356,8 +356,8 @@ app.get('*', (_req, res) => {
 
 // ── Start Server ─────────────────────────────────────────────────────────────
 
-app.listen(PORT, () => {
-  console.log(`🗳️  ElectionGuide AI running at http://localhost:${PORT}`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🗳️  ElectionGuide AI running at http://localhost:${PORT} and on your local network`);
   console.log(`📊 ${MODELS.length} Gemini models in fallback chain`);
   if (!process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === 'your_api_key_here') {
     console.warn('⚠️  Warning: GEMINI_API_KEY not set! Copy .env.example to .env and add your key.');
