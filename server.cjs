@@ -104,6 +104,9 @@ OUTPUT FORMAT:
 /** @type {Map<string, {history: Array, lastActive: number}>} Active chat sessions */
 const sessions = new Map();
 
+/** @type {Map<string, string>} Cache for exact same API requests to save quota */
+const responseCache = new Map();
+
 /** @constant {number} Session time-to-live in milliseconds (30 minutes) */
 const SESSION_TTL = 30 * 60 * 1000;
 
@@ -253,6 +256,68 @@ async function callGeminiWithFallback(history, userMessage) {
 // ── API Endpoints ────────────────────────────────────────────────────────────
 
 /**
+ * Retrieves an existing session or creates a new one with the sanitized ID.
+ * @param {string} sessionId - The raw session ID from the request.
+ * @returns {Object} The session object containing history and lastActive timestamp.
+ */
+function getSession(sessionId) {
+  const sid = sanitizeSessionId(sessionId);
+  if (!sessions.has(sid)) {
+    sessions.set(sid, { history: [], lastActive: Date.now() });
+  }
+  const session = sessions.get(sid);
+  session.lastActive = Date.now();
+  return session;
+}
+
+/**
+ * Updates the session history array, keeping only the last 40 messages to prevent token bloat.
+ * @param {Object} session - The session object to update.
+ * @param {string} userMessage - The user's input text.
+ * @param {string} aiText - The AI's response text.
+ */
+function updateSessionHistory(session, userMessage, aiText) {
+  session.history.push({ role: 'user', text: userMessage });
+  session.history.push({ role: 'model', text: aiText });
+  if (session.history.length > 40) {
+    session.history = session.history.slice(-40);
+  }
+}
+
+/**
+ * Handles API errors gracefully, returning standardized JSON responses.
+ * @param {Error} error - The caught error object.
+ * @param {Object} res - The Express response object.
+ * @returns {Object} JSON response indicating the error.
+ */
+function handleApiError(error, res) {
+  console.error('Chat API error:', error.message?.substring(0, 300));
+
+  if (error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED')) {
+    return res.status(429).json({
+      error: 'api_rate_limited',
+      message: "All AI models are currently at capacity. Please try again in a minute.",
+    });
+  }
+
+  if (error.status === 400 && error.message?.includes('API key not valid')) {
+    return res.status(400).json({
+      error: 'invalid_key',
+      message: "The API key appears to be invalid. Please get a new key from https://aistudio.google.com.",
+    });
+  }
+
+  try {
+    fs.appendFileSync('server_error.log', `[${new Date().toISOString()}] ${error.stack}\n\n`);
+  } catch (_) { /* ignore logging failures */ }
+
+  return res.status(500).json({
+    error: 'server_error',
+    message: "Something went wrong on my end. Please try again in a moment!",
+  });
+}
+
+/**
  * POST /api/chat
  * Main chat endpoint. Accepts user messages, validates input, manages sessions,
  * and returns Gemini AI responses with multi-turn conversation context.
@@ -261,72 +326,43 @@ async function callGeminiWithFallback(history, userMessage) {
  * @param {string} req.body.message - The user's chat message (1-500 chars).
  * @param {string} [req.body.sessionId] - Optional session identifier for multi-turn conversations.
  * @returns {Object} JSON response with { response: string }.
- * @returns {Object} Error JSON with { error: string, message: string } on failure.
  */
 app.post('/api/chat', chatLimiter, async (req, res) => {
   try {
     const { message, sessionId } = req.body;
-
-    // Validate and sanitize input
+    
     const validation = validateInput(message);
     if (!validation.valid) {
-      return res.status(400).json({
-        error: validation.reason,
-        message: ERROR_MESSAGES[validation.reason],
-      });
+      return res.status(400).json({ error: validation.reason, message: ERROR_MESSAGES[validation.reason] });
     }
 
-    // Get or create session with sanitized ID
     const sid = sanitizeSessionId(sessionId);
-    if (!sessions.has(sid)) {
-      sessions.set(sid, { history: [], lastActive: Date.now() });
+    const session = getSession(sid);
+    
+    // Check cache for duplicate request (efficiency optimization)
+    const cacheKey = `${sid}_${validation.message}_${session.history.length}`;
+    if (responseCache.has(cacheKey)) {
+      console.log('⚡ Returning cached response for:', validation.message);
+      return res.json({ response: responseCache.get(cacheKey) });
     }
 
-    const session = sessions.get(sid);
-    session.lastActive = Date.now();
-
-    // Call Gemini API with model fallback
     const aiText = await callGeminiWithFallback(session.history, validation.message);
 
-    if (!aiText) {
-      throw new Error('Empty response from AI');
+    if (!aiText) throw new Error('Empty response from AI');
+
+    updateSessionHistory(session, validation.message, aiText);
+    
+    // Save to cache
+    responseCache.set(cacheKey, aiText);
+    if (responseCache.size > 1000) {
+      const firstKey = responseCache.keys().next().value;
+      responseCache.delete(firstKey);
     }
 
-    // Update session history (keep last 20 exchanges to manage context window)
-    session.history.push({ role: 'user', text: validation.message });
-    session.history.push({ role: 'model', text: aiText });
-    if (session.history.length > 40) {
-      session.history = session.history.slice(-40);
-    }
-
-    res.json({ response: aiText });
+    return res.json({ response: aiText });
 
   } catch (error) {
-    console.error('Chat API error:', error.message?.substring(0, 300));
-
-    if (error.status === 429 || error.message?.includes('RESOURCE_EXHAUSTED')) {
-      return res.status(429).json({
-        error: 'api_rate_limited',
-        message: "All AI models are currently at capacity. Please try again in a minute.",
-      });
-    }
-
-    if (error.status === 400 && error.message?.includes('API key not valid')) {
-      return res.status(400).json({
-        error: 'invalid_key',
-        message: "The API key appears to be invalid. Please get a new key from https://aistudio.google.com.",
-      });
-    }
-
-    // Log full error stack for debugging
-    try {
-      fs.appendFileSync('server_error.log', `[${new Date().toISOString()}] ${error.stack}\n\n`);
-    } catch (_) { /* ignore logging failures */ }
-
-    res.status(500).json({
-      error: 'server_error',
-      message: "Something went wrong on my end. Please try again in a moment!",
-    });
+    return handleApiError(error, res);
   }
 });
 
